@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pcaplens"
+version = "0.1.0"
+description = "Read a pcap the way an LLM should: summary first, evidence always. A zero-dependency packet reader with CLI + MCP server, no tshark required."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "xuange-hu" }]
+keywords = ["pcap", "pcapng", "wireshark", "tshark", "network-forensics", "dfir", "packet-analysis", "mcp", "model-context-protocol", "dns", "tls", "http"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Security",
+    "Topic :: System :: Networking :: Monitoring",
+    "Intended Audience :: Information Technology",
+]
+
+# The core intentionally depends on NOTHING. No tshark, no libpcap, no Npcap:
+# if it needs a compiler or an installer, we have lost the Windows reader in
+# the first paragraph. Everything optional lives in extras.
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.2,<2"]
+dev = ["pytest>=8.0", "ruff>=0.9"]
+
+[project.scripts]
+pcaplens = "pcaplens.cli:main"
+# dedicated entry point so `uvx --from "pcaplens[mcp]" pcaplens-mcp` needs no
+# clone and no venv. Requires the `mcp` extra - asserted in tests/test_packaging.py
+pcaplens-mcp = "pcaplens.mcp_server:run"
+
+[project.urls]
+Homepage = "https://github.com/xuange-hu/pcaplens"
+Repository = "https://github.com/xuange-hu/pcaplens"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82", "F401"]
