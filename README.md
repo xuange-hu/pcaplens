@@ -3,7 +3,7 @@
 > **Summary first, evidence always. No tshark anywhere in sight.**
 
 [![CI](https://github.com/xuange-hu/pcaplens/actions/workflows/ci.yml/badge.svg)](https://github.com/xuange-hu/pcaplens/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-62%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-57%20passing-brightgreen.svg)](tests/)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-9%20tools-green.svg)](https://modelcontextprotocol.io)

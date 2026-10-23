@@ -56,3 +56,16 @@ jobs:
 
       - name: MCP manifest
         run: pcaplens mcp --check
+
+      # Soft check: the README test badge went stale twice (277 vs 282, 62 vs 57)
+      # and nobody noticed. Print the mismatch instead of failing the build --
+      # a wrong number should not turn CI red, but it must show in every log.
+      - name: README test-count badge matches reality
+        if: runner.os == 'Linux'
+        run: |
+          actual=$(pytest --collect-only -q 2>/dev/null | grep -oE "[0-9]+ tests? collected" | grep -oE "^[0-9]+")
+          claimed=$(grep -oE "tests-[0-9]+%20passing" README.md | grep -oE "[0-9]+" | head -1)
+          echo "collected=$actual badge=$claimed"
+          if [ "$actual" != "$claimed" ]; then
+            echo "::warning::README badge says $claimed but pytest collects $actual - update README.md"
+          fi
