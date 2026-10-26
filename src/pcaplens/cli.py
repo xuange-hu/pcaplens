@@ -27,6 +27,7 @@ from .render import (
     render_tls,
 )
 from .synth import demo_capture
+import contextlib
 
 def _frames_by_number(path: str, numbers: list[int]) -> list[Frame]:
     wanted = set(numbers)
@@ -90,7 +91,30 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def force_utf8_stdio() -> None:
+    """Make stdout/stderr UTF-8 before the first byte is printed.
+
+    Windows consoles default to cp1252/cp936, which cannot encode characters
+    this tool prints by design (invisible/bidi marks, CJK hints, box drawing).
+    Without this, the first command a new visitor runs dies with
+    ``UnicodeEncodeError: 'charmap' codec can't encode character ...`` -- a
+    failure no Linux or macOS machine can reproduce. Reconfiguring up front
+    changes nothing on platforms that were already UTF-8.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:  # e.g. a plain StringIO in a test host
+            continue
+        if (getattr(stream, "encoding", "") or "").lower().replace("-", "") == "utf8":
+            continue
+        # suppress() rather than try/except/pass: some repos' ruff config
+        # enables SIM105, and the two are behaviourally identical here.
+        with contextlib.suppress(ValueError, OSError):  # detached / closed stream
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
+    force_utf8_stdio()
     args = build_parser().parse_args(argv)
 
     if args.command == "demo":
