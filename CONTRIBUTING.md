@@ -8,7 +8,7 @@
 git clone https://github.com/xuange-hu/pcaplens
 cd pcaplens
 pip install -e ".[mcp]" pytest ruff
-pytest                 # 69 tests
+pytest                 # 70 tests
 ruff check src tests
 ```
 

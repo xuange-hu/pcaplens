@@ -22,7 +22,7 @@ def demo_file(tmp_path) -> str:
 
 def test_manifest_matches_decorated_tool_count():
     manifest = mcp_server.tool_manifest()
-    assert len(manifest) == 9, f"expected 9 tools, got {[t['name'] for t in manifest]}"
+    assert len(manifest) == 10, f"expected 10 tools, got {[t['name'] for t in manifest]}"
     assert all(t["description"] for t in manifest), "every tool needs a description"
 
 
@@ -32,7 +32,16 @@ def test_tool_names_are_stable():
     assert names == {
         "pcap_summary", "pcap_conversations", "pcap_talkers", "pcap_protocols",
         "pcap_packet", "pcap_search", "pcap_dns", "pcap_http", "pcap_tls",
+        "pcap_demo",
     }
+
+
+def test_demo_tool_writes_a_readable_capture(tmp_path):
+    """One call must produce a pcap the other tools can actually open."""
+    payload = json.loads(asyncio.run(mcp_server.pcap_demo(str(tmp_path))))
+    assert payload["frames"] > 0
+    digest = json.loads(asyncio.run(mcp_server.pcap_summary(payload["path"])))
+    assert digest
 
 
 def test_served_tools_match_manifest_with_descriptions():

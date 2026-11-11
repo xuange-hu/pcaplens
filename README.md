@@ -3,7 +3,7 @@
 > **Summary first, evidence always. No tshark anywhere in sight.**
 
 [![CI](https://github.com/xuange-hu/pcaplens/actions/workflows/ci.yml/badge.svg)](https://github.com/xuange-hu/pcaplens/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-69%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-70%20passing-brightgreen.svg)](tests/)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-9%20tools-green.svg)](https://modelcontextprotocol.io)
@@ -124,9 +124,9 @@ pip install "pcaplens[mcp]"
 }
 ```
 
-Nine tools: `pcap_summary`, `pcap_conversations`, `pcap_talkers`,
+Ten tools: `pcap_summary`, `pcap_conversations`, `pcap_talkers`,
 `pcap_protocols`, `pcap_packet`, `pcap_search`, `pcap_dns`, `pcap_http`,
-`pcap_tls`.
+`pcap_tls`, `pcap_demo`.
 
 Each one follows the same discipline as the CLI: **no raw dumps**, every list
 is capped and says how many items it dropped, and every claim carries the
@@ -169,7 +169,7 @@ guess.
 ```bash
 git clone https://github.com/xuange-hu/pcaplens && cd pcaplens
 pip install -e ".[mcp]"
-pytest -q                       # 69 tests
+pytest -q                       # 70 tests
 PYTHONPATH=src python -m pcaplens.cli demo demo.pcap
 ```
 

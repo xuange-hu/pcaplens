@@ -1,6 +1,6 @@
 """MCP server: the same reader, exposed to AI coding agents.
 
-Nine tools, and each one follows the discipline the rest of the project is
+Ten tools, and each one follows the discipline the rest of the project is
 built on:
 
 * it never dumps the capture — it hands back a digest and a way to drill in;
@@ -174,6 +174,28 @@ async def pcap_tls(path: str, top: int = 25) -> str:
     return _text({
         "sni": [{"sni": s, "count": c} for s, c in summary.tls_sni],
         "note": "from ClientHello only; encrypted traffic is not decrypted.",
+    })
+
+
+@mcp.tool()
+async def pcap_demo(directory: str = "") -> str:
+    """Write a synthetic capture and return its path, so the other tools have
+    something to read. Use it when no pcap is at hand - one call, no network."""
+    import os
+    import tempfile
+
+    from .pcap import write_pcap
+    from .synth import demo_capture
+
+    root = directory or os.path.join(tempfile.gettempdir(), "pcaplens-demo")
+    os.makedirs(root, exist_ok=True)
+    path = os.path.join(root, "demo.pcap")
+    frames = demo_capture()
+    write_pcap(path, frames)
+    return _text({
+        "path": path,
+        "frames": len(frames),
+        "next": f"pcap_summary {path}",
     })
 
 
