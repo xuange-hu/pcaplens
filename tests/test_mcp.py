@@ -35,6 +35,20 @@ def test_tool_names_are_stable():
     }
 
 
+def test_served_tools_match_manifest_with_descriptions():
+    """The names an agent calls must be the names the manifest promises, and
+    FastMCP serves an empty description when the registered function has no
+    docstring - an unidentified tool is an uncallable tool."""
+    pytest.importorskip("mcp")
+    server = mcp_server.mcp
+    tools = asyncio.run(server.list_tools())
+    served = {t.name for t in tools}
+    manifest = {t["name"] for t in mcp_server.tool_manifest()}
+    assert served == manifest, f"only served: {served - manifest}; only manifest: {manifest - served}"
+    for t in tools:
+        assert (t.description or "").strip(), f"{t.name} has no description"
+
+
 def test_pcap_summary_returns_parseable_json(demo_file):
     result = asyncio.run(mcp_server.pcap_summary(demo_file))
     if isinstance(result, tuple):  # mcp returns (content, meta) on some versions
