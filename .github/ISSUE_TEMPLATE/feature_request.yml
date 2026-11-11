@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a rule, decoder, flag or MCP tool
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of change?
+      options:
+        - New protocol decoder
+        - New CLI subcommand
+        - New or changed MCP tool
+        - Malformed-pcap robustness
+        - Docs
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: |
+        A concrete sample helps more than a paragraph: paste the input
+        that should be flagged (or accepted), and what you expect back.
+      placeholder: |
+        input: ...
+        expected finding: file:line, rule id, message
+    validations:
+      required: false
+  - type: checkboxes
+    id: legal
+    attributes:
+      label: Confirmation
+      options:
+        - label: This targets code the reporter owns or is authorized to assess
+          required: true

@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in pcaplens is broken
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    value: |
+      Thanks for the report. Please confirm you are on the latest `main`.
+      For security-sensitive issues use the Security tab (private advisory)
+      instead of a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: pcaplens version / commit
+      placeholder: "0.1.0 (or commit sha)"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - CLI
+        - MCP server
+        - Packet parser
+        - Docs
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: |
+        The smallest input that shows the problem. For pcap reading without tshark
+        that is usually a handful of lines or one file.
+      placeholder: |
+        1. pcaplens summary capture.pcap
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      description: What you expected, what you got, and the exact output.
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS / Python version
+      placeholder: "Windows 11 / Python 3.12"
+    validations:
+      required: true
