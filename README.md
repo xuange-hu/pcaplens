@@ -18,6 +18,18 @@ The core is **standard-library only**. No Wireshark, no tshark, no libpcap,
 no Npcap, no compiler. `pip install pcaplens` works on a locked-down Windows
 laptop with no network share and no admin rights.
 
+## Contents
+
+- [Why this exists](#why-this-exists)
+- [Quick start](#quick-start)
+- [What the output looks like](#what-the-output-looks-like)
+- [Let an AI agent drive it](#let-an-ai-agent-drive-it)
+- [What it parses](#what-it-parses)
+- [Comparison](#comparison)
+- [Install from source](#install-from-source)
+- [Limitations](#limitations)
+- [License](#license)
+
 ## Why this exists
 
 Every popular "let your LLM read a pcap" project shells out to `tshark`.
