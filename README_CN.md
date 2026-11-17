@@ -1,5 +1,10 @@
 # pcaplens — 让 LLM 读抓包的方式
 
+[![tests](https://img.shields.io/badge/tests-70-brightgreen)](https://github.com/xuange-hu/pcaplens/actions)
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![deps](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen)](https://github.com/xuange-hu/pcaplens/blob/main/pyproject.toml)
+
 > **先给地图，再给证据。全程不需要 tshark。**
 
 [英文说明](README.md) · [CI](https://github.com/xuange-hu/pcaplens/actions/workflows/ci.yml)
