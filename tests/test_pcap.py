@@ -151,3 +151,54 @@ def test_demo_capture_writes_a_usable_file(tmp_path):
     packets = list(read(str(path)))
     assert len(packets) == 12
     assert all(p.link_type == 1 for p in packets)
+
+
+
+def _build_pcapng_external(endian: str, ts: float, payload: bytes) -> bytes:
+    """Build a pcapng by hand, independent of this project's writer.
+
+    Self-generated fixtures that use write_pcapng cannot catch a writer that
+    gets the BOM or timestamp encoding wrong: both sides agree on the same
+    mistake. Constructing the bytes here breaks that circularity.
+    """
+    def block(btype: int, body: bytes) -> bytes:
+        pad = b"\x00" * ((4 - len(body) % 4) % 4)
+        length = 12 + len(body) + len(pad)
+        return (struct.pack(endian + "II", btype, length) + body + pad
+                + struct.pack(endian + "I", length))
+
+    shb = struct.pack(endian + "IHHq", 0x1A2B3C4D, 1, 0, -1)
+    idb = (struct.pack(endian + "HHI", 1, 0, 65535)
+           + struct.pack(endian + "HHB3x", 9, 1, 6)
+           + struct.pack(endian + "HH", 0, 0))
+    ticks = int(round(ts * 1_000_000))
+    epb = (struct.pack(endian + "IIIII", 0, ticks >> 32, ticks & 0xFFFFFFFF,
+                       len(payload), len(payload)) + payload)
+    return block(0x0A0D0D0A, shb) + block(1, idb) + block(6, epb)
+
+
+@pytest.mark.parametrize("endian", [">", "<"])
+def test_pcapng_reader_honours_section_byte_order(tmp_path, endian):
+    """CRITICAL regression: little-endian pcapng read as big-endian = 0 packets."""
+    path = tmp_path / "ext.pcapng"
+    payload = b"\xde\xad\xbe\xef" * 4
+    ts = 1700000000.5
+    path.write_bytes(_build_pcapng_external(endian, ts, payload))
+    packets = list(read(str(path)))
+    assert len(packets) == 1
+    assert packets[0].data == payload
+    assert packets[0].timestamp == pytest.approx(ts)
+    want = "big" if endian == ">" else "little"
+    assert info(str(path)).byte_order == want
+
+
+def test_write_pcapng_bom_and_timestamp_match_external_tools(tmp_path):
+    """CRITICAL regression: correct SHB byte-order magic + 64-bit tick encoding."""
+    path = tmp_path / "out.pcapng"
+    ts = 1700000000.5
+    payload = b"\xaa" * 14
+    write_pcapng(str(path), [(ts, payload)])
+    raw = path.read_bytes()
+    assert raw[8:12] == b"\x1a\x2b\x3c\x4d"  # not the block type
+    pk = list(read(str(path)))
+    assert len(pk) == 1 and pk[0].timestamp == pytest.approx(ts)

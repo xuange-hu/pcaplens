@@ -219,23 +219,41 @@ class _Block:
     body: bytes
     offset: int
     length: int
+    endian: str = ">"
+
+
+# byte-order magic stored inside a SHB body. It is the *same* 4 bytes in both
+# byte orders (0x1A2B3C4D read big-endian == 0x4D3C2B1A read little-endian),
+# which is precisely what lets a reader discover the section's byte order.
+_SHB_BOM = b"\x1a\x2b\x3c\x4d"
 
 
 def _iter_blocks(path: str) -> Iterator[_Block]:
-    """Walk pcapng blocks, skipping anything we do not understand."""
+    """Walk pcapng blocks, honouring each section's byte-order magic.
+
+    A pcapng file may contain several sections, each with its own byte order,
+    declared by the SHB's byte-order magic. Every integer in that section —
+    block type/length, IDB fields, EPB timestamps and lengths — is encoded in
+    that order. Hard-coding big-endian silently reads little-endian captures
+    as zero packets.
+    """
     with open(path, "rb") as fh:
-        first = fh.read(4)
-        if len(first) < 4:
-            return
-        if struct.unpack(">I", first)[0] != _BT_SHB:
+        first = fh.read(12)
+        if len(first) < 12:
+            raise PcapError("pcapng file is too short to hold a section header block")
+        if first[:4] != struct.pack(">I", _BT_SHB):
             raise PcapError("pcapng file does not start with a section header block")
+        # bytes 8:12 of the SHB are the magic *as stored on disk*
+        endian = ">" if first[8:12] == _SHB_BOM else "<"
+        if first[8:12] not in (_SHB_BOM, _SHB_BOM[::-1]):
+            raise PcapError(f"invalid SHB byte-order magic {first[8:12].hex()}")
         pos = 0
         while True:
             fh.seek(pos)
             head = fh.read(8)
             if len(head) < 8:
                 return
-            btype, blen = struct.unpack(">II", head)
+            btype, blen = struct.unpack(endian + "II", head)
             if blen < 12 or blen % 4:
                 raise PcapError(f"block at offset {pos} declares an invalid length {blen}")
             body_len = blen - 12
@@ -244,7 +262,15 @@ def _iter_blocks(path: str) -> Iterator[_Block]:
                 return  # truncated tail
             if len(fh.read(4)) < 4:
                 return
-            yield _Block(type=btype, body=body, offset=pos, length=blen)
+            # a new SHB starts a new section and may flip the byte order
+            if btype == _BT_SHB and len(body) >= 4:
+                if body[:4] == _SHB_BOM:
+                    endian = ">"
+                elif body[:4] == _SHB_BOM[::-1]:
+                    endian = "<"
+                else:
+                    raise PcapError(f"invalid SHB byte-order magic {body[:4].hex()}")
+            yield _Block(type=btype, body=body, offset=pos, length=blen, endian=endian)
             pos += blen
 
 
@@ -258,16 +284,16 @@ def _parse_tsresol(value: bytes) -> int:
     return 10 ** unit
 
 
-def _idb_facts(body: bytes) -> tuple[int, int | None, int]:
+def _idb_facts(body: bytes, endian: str = ">") -> tuple[int, int | None, int]:
     """Return ``(linktype, snaplen, ts_divisor)`` from an IDB body."""
     if len(body) < 8:
         return LINK_ETHERNET, None, 1_000_000
-    linktype, _, snaplen = struct.unpack(">HHI", body[:8])
+    linktype, _, snaplen = struct.unpack(endian + "HHI", body[:8])
     div = 1_000_000
     opos = 8
     opts = body
     while opos + 4 <= len(opts):
-        ocode, olen = struct.unpack(">HH", opts[opos:opos + 4])
+        ocode, olen = struct.unpack(endian + "HH", opts[opos:opos + 4])
         if ocode == 0:  # opt_endofopt
             break
         if ocode == 9:
@@ -281,8 +307,9 @@ def _read_pcapng(path: str) -> Iterator[Packet]:
     divisors: dict[int, int] = {}
     number = 0
     for block in _iter_blocks(path):
+        en = block.endian
         if block.type == _BT_IDB:
-            linktype, snap, div = _idb_facts(block.body)
+            linktype, snap, div = _idb_facts(block.body, en)
             iface = len(interfaces)
             interfaces[iface] = linktype
             divisors[iface] = div
@@ -291,19 +318,19 @@ def _read_pcapng(path: str) -> Iterator[Packet]:
             if block.type == _BT_EPB:
                 if len(block.body) < 20:
                     continue
-                iface, ts_hi, ts_lo, cap_len, orig_len = struct.unpack(">IIIII", block.body[:20])
+                iface, ts_hi, ts_lo, cap_len, orig_len = struct.unpack(en + "IIIII", block.body[:20])
                 div = divisors.get(iface, 1_000_000)
                 ts = ((ts_hi << 32) | ts_lo) / div
                 data = block.body[20:20 + cap_len]
             elif block.type == _BT_SPB:
                 if len(block.body) < 4:
                     continue
-                orig_len = struct.unpack(">I", block.body[:4])[0]
+                orig_len = struct.unpack(en + "I", block.body[:4])[0]
                 iface, ts, data = 0, 0.0, block.body[4:orig_len]
             else:  # _BT_PB, the very old single-interface variant
                 if len(block.body) < 20:
                     continue
-                iface, ts_hi, ts_lo, cap_len, orig_len = struct.unpack(">IIIII", block.body[:20])
+                iface, ts_hi, ts_lo, cap_len, orig_len = struct.unpack(en + "IIIII", block.body[:20])
                 div = divisors.get(0, 1_000_000)
                 ts = ((ts_hi << 32) | ts_lo) / div
                 data = block.body[20:20 + cap_len]
@@ -327,15 +354,17 @@ def _read_pcapng(path: str) -> Iterator[Packet]:
 def _pcapng_info(path: str) -> CaptureInfo:
     links: dict[int, int] = {}
     snaplen: int | None = None
+    byte_order = "big"
     for block in _iter_blocks(path):
         if block.type == _BT_IDB:
-            linktype, snap, _ = _idb_facts(block.body)
+            linktype, snap, _ = _idb_facts(block.body, block.endian)
             links[len(links)] = linktype
             if snaplen is None and snap:
                 snaplen = snap
+            byte_order = "big" if block.endian == ">" else "little"
         if len(links) >= 1 and snaplen:
             break
-    return CaptureInfo(path=path, format="pcapng", link_types=links, byte_order="big", snaplen=snaplen)
+    return CaptureInfo(path=path, format="pcapng", link_types=links, byte_order=byte_order, snaplen=snaplen)
 
 
 # --- public readers -------------------------------------------------------- #
@@ -370,16 +399,26 @@ def write_pcapng(path: str, frames: list[tuple[float, bytes]], link_type: int = 
     Lets the tests round-trip both formats and lets users convert without
     installing anything.
     """
-    shb = struct.pack(">IHHq", _BT_SHB, 1, 0, -1)
-    idb = struct.pack(">HHI", link_type, 0, 65535)
+    # SHB body: byte-order magic (NOT the block type), version, section len.
+    shb = struct.pack(">IHHq", 0x1A2B3C4D, 1, 0, -1)
+    # IDB body: linktype/reserved/snaplen + if_tsresol(9)=6 meaning 10^-6 s,
+    # then end-of-options. This makes the tick unit explicit to other tools.
+    idb = (
+        struct.pack(">HHI", link_type, 0, 65535)
+        + struct.pack(">HHB3x", 9, 1, 6)
+        + struct.pack(">HH", 0, 0)
+    )
     with open(path, "wb") as fh:
         fh.write(_pcapng_block(_BT_SHB, shb))
         fh.write(_pcapng_block(_BT_IDB, idb))
         for ts, data in frames:
-            sec = int(ts)
-            frac = int(round((ts - sec) * 1_000_000)) % 1_000_000
+            # An EPB timestamp is a single 64-bit tick count = ts * 10^6 here,
+            # split into high/low 32-bit halves. Storing seconds and micros in
+            # the two halves makes outside tools read the time ~4295x too large.
+            ticks = int(round(ts * 1_000_000)) & 0xFFFFFFFFFFFFFFFF
+            ts_hi, ts_lo = ticks >> 32, ticks & 0xFFFFFFFF
             padded = data + b"\x00" * ((4 - len(data) % 4) % 4)
-            body = struct.pack(">IIIII", 0, sec, frac, len(data), len(data)) + padded
+            body = struct.pack(">IIIII", 0, ts_hi, ts_lo, len(data), len(data)) + padded
             fh.write(_pcapng_block(_BT_EPB, body))
     return len(frames)
 
